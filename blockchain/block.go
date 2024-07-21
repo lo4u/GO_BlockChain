@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"GOPreject/constcoe"
+	"GOPreject/merkletree"
 	"GOPreject/transaction"
 	"GOPreject/utils"
 	"encoding/gob"
@@ -17,6 +18,7 @@ type Block struct {
 	PrevHash     []byte                     //前一个区块的摘要
 	Target       []byte                     //工作目标值，用于POW
 	Nonce        int64                      //工作计算的结果
+	MTree        *merkletree.MerkleTree     //merkleTree结构
 	Transactions []*transaction.Transaction //载荷
 }
 
@@ -35,13 +37,14 @@ func (pBlock *Block) SetHash() {
 		pBlock.PrevHash,
 		pBlock.Target,
 		utils.Int2Bytes(pBlock.Nonce),
-		pBlock.getTransactionSummary()}, []byte{})
+		pBlock.getTransactionSummary(),
+		pBlock.MTree.RootNode.HashData}, []byte{})
 	hash := sha256.Sum256(infor)
 	pBlock.Hash = hash[:]
 }
 
-func CreateBlock(prevHash []byte, transaction []*transaction.Transaction) *Block {
-	block := Block{time.Now().Unix(), []byte{}, prevHash, []byte{}, 0, transaction}
+func CreateBlock(prevHash []byte, transactions []*transaction.Transaction) *Block {
+	block := Block{time.Now().Unix(), []byte{}, prevHash, []byte{}, 0, merkletree.CreateMerkleTree(transactions), transactions}
 	block.Target = block.GetTarget()
 	block.Nonce = block.FindNonce()
 	block.SetHash()

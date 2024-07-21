@@ -1,12 +1,8 @@
 package main
 
-import (
-	"GOPreject/cli"
-	"os"
-)
+import "fmt"
 
 func main() {
-	defer os.Exit(0)
-	pCLI := cli.CommandLine{}
-	pCLI.Run()
+	a := make([]int, 0, 5)
+	fmt.Println(a[0])
 }
