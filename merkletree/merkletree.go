@@ -82,7 +82,7 @@ func (merkleNode *MerkleNode) Find(data []byte, route []int, hashRoute [][]byte)
 		if merkleNode.RightNode != nil {
 			findFlag, tempRoute, tempHashRoute := merkleNode.RightNode.Find(
 				data,
-				append(route, 0),
+				append(route, 1),
 				append(hashRoute, merkleNode.LeftNode.HashData),
 			)
 			if findFlag {
