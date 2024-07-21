@@ -16,10 +16,10 @@ func GenerateTransaction(outCash int, inAccount string, toAccount string, prevTx
 	prevTxIDHash := sha256.Sum256([]byte(prevTxID))
 	inAccountHash := sha256.Sum256([]byte(inAccount))
 	toAccountHash := sha256.Sum256([]byte(toAccount))
-	txIn := transaction.TxInput{prevTxIDHash[:], outIdx, inAccountHash[:], nil}
-	txOut := transaction.TxOutput{outCash, toAccountHash[:]}
-	tx := transaction.Transaction{[]byte("This is the Base Transaction!"),
-		[]transaction.TxInput{txIn}, []transaction.TxOutput{txOut}} //Whether set ID is not nessary
+	txIn := transaction.TxInput{TxID: prevTxIDHash[:], OutIdx: outIdx, PubKey: inAccountHash[:], Sign: nil}
+	txOut := transaction.TxOutput{Value: outCash, HashPubKey: toAccountHash[:]}
+	tx := transaction.Transaction{ID: []byte("This is the Base Transaction!"),
+		Inputs: []transaction.TxInput{txIn}, Outputs: []transaction.TxOutput{txOut}} //Whether set ID is not nessary
 	tx.SetID() //Here the ID is reset to the hash of the whole transaction. Signature is skipped
 	return &tx
 }
