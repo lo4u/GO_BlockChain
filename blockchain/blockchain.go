@@ -4,6 +4,7 @@ import (
 	"GOPreject/constcoe"
 	"GOPreject/transaction"
 	"GOPreject/utils"
+	"GOPreject/utxoset"
 	"GOPreject/wallet"
 	"bytes"
 	"encoding/hex"
@@ -216,6 +217,7 @@ func (pBlockChain *BlockChain) FindUTXs(address []byte) []*transaction.Transacti
 	return UTX
 }
 
+// 弃用
 func (pBlockChain *BlockChain) FindUTXOs(address []byte) (int, map[string]int) {
 	unspentOut := make(map[string]int)
 	//用FindUTX找到未使用的交易输出所在的交易
@@ -308,4 +310,86 @@ func (pBlockChain *BlockChain) CreateTransaction(from, to []byte, amount int) (*
 	tx.Sign(fromWallet.PrivateKey)
 
 	return &tx, true
+}
+
+func (blockChain *BlockChain) GetCurrentBlock() *Block {
+	var block *Block
+	err := blockChain.Database.View(func(txn *badger.Txn) error {
+		item, err := txn.Get(blockChain.LastHash)
+		utils.Handle(err)
+
+		err = item.Value(func(val []byte) error {
+			block = DeSerialize(val)
+			return nil
+		})
+		utils.Handle(err)
+		return nil
+	})
+	utils.Handle(err)
+	return block
+}
+
+func (blockChain *BlockChain) GetHeight() int64 {
+	return blockChain.GetCurrentBlock().Height
+}
+
+func (pBlockChain *BlockChain) GetUTXOs(address []byte) []transaction.UTXO {
+	var utxos []transaction.UTXO
+	unspentTxs := pBlockChain.FindUTXs(address)
+
+Work:
+	for _, tx := range unspentTxs {
+		for i, output := range tx.Outputs {
+			if output.ToAddressEqual(address) {
+				utxos = append(utxos, transaction.UTXO{
+					TxID:   tx.ID,
+					OutIdx: i,
+					Output: output,
+				})
+				continue Work
+			}
+		}
+	}
+	return utxos
+}
+
+func (pBlockChain *BlockChain) CreataUTXOSet(address []byte) *utxoset.UTXOSet {
+	pWallet := wallet.LoadWallet(address)
+	utxos := pBlockChain.GetUTXOs(pWallet.Address())
+	return utxoset.CreateUTXOSet(pWallet.Address(), pWallet.GetUTXOSetDir(), utxos, pBlockChain.GetHeight())
+}
+
+// 默认以往的区块不会删除，若是height变化一定是新的区块出现
+func (pBlockChain *BlockChain) UpdateUTXOSet(address []byte) {
+	pWallet := wallet.LoadWallet(address)
+	utxoSet := pWallet.LoadUTXOSet()
+
+	if pBlockChain.GetHeight() > utxoSet.Height+1 {
+		utxoSet.DB.Close()
+		err := pWallet.RemoveUTXOSet()
+		utils.Handle(err)
+		newUTXOSet := pBlockChain.CreataUTXOSet(address)
+		newUTXOSet.DB.Close()
+		return
+	} else if pBlockChain.GetHeight() == utxoSet.Height+1 {
+		pBlock := pBlockChain.GetCurrentBlock()
+		for _, tx := range pBlock.Transactions {
+			for _, input := range tx.Inputs {
+				if input.FromAddressEqual(address) {
+					utxoSet.DelUTXO(input.TxID, input.OutIdx)
+				}
+			}
+			for outIdx, output := range tx.Outputs {
+				if output.ToAddressEqual(address) {
+					utxoSet.AddUTXO(&transaction.UTXO{
+						TxID:   tx.ID,
+						OutIdx: outIdx,
+						Output: output,
+					})
+				}
+			}
+		}
+		utxoSet.UpdateHeight(pBlock.Height)
+	}
+	utxoSet.DB.Close()
 }

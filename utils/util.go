@@ -31,6 +31,14 @@ func Int2Bytes(num int64) []byte {
 	return buf.Bytes()
 }
 
+func Bytes2Int(bt []byte) int64 {
+	buf := bytes.NewBuffer(bt)
+	var ret int64
+	err := binary.Read(buf, binary.BigEndian, &ret)
+	Handle(err)
+	return ret
+}
+
 func FileExists(fileAddr string) bool {
 	if _, err := os.Stat(fileAddr); os.IsNotExist(err) {
 		return false

@@ -21,12 +21,14 @@ func (pCLI *CommandLine) printUsage() {
 	fmt.Println("And then you can use the wallet's address to create a blockchain and declare the owner.")
 	fmt.Println("Make transactions to expand the blockchain.")
 	fmt.Println("In addition, don't forget to run mine function after transactions are collected.")
+	fmt.Println("Please make sure the UTXO set init before querying the balance of a wallet")
 	fmt.Println("------------------------------------------------------------------------------------------------------------------")
 	fmt.Println("createwallet -refname REFNAME				---->Creates and save a wallet. The refname is optional.")
 	fmt.Println("walletinfo -refname NAME -address ADDRESS				---->Print the information of a wallet. At least one of the refname and address is supplied.")
 	fmt.Println("walletupdate					---->Register and update all the wallets (especially when you add an existed .wlt file).")
 	fmt.Println("walletlist					---->List all the wallets found (make sure you have run walletupdate first).")
 	fmt.Println("createblockchain -refname NAME -address ADDRESS					---->Creates a blockchain with the owner you input (address or refname).")
+	fmt.Println("initutxoset					---->Init all the UTXO sets of known wallets")
 	fmt.Println("balance -refname REFNAME -address ADDRESS					---->Query the balance of the address or refname you input")
 	fmt.Println("blockchaininfo							---->Prints the blocksin the blockchain")
 	fmt.Println("sendbyname -from FROMNAME -to TONAME -amount AMOUNT		---->Make a transaction and put it into candidate block, by refname")
@@ -81,6 +83,17 @@ func (*CommandLine) walletList() {
 	}
 }
 
+func (*CommandLine) initUTXOSet() {
+	pBlockChain := blockchain.ContinueBlockChain()
+	defer pBlockChain.Database.Close()
+	pRefList := wallet.LoadRefList()
+	for addr := range *pRefList {
+		utxoset := pBlockChain.CreataUTXOSet([]byte(addr))
+		utxoset.DB.Close()
+	}
+	fmt.Println("Succeed in initializing UTXO sets")
+}
+
 func (pCLI *CommandLine) createBlockChain(address string) {
 	pChain := blockchain.InitBlockChain([]byte(address))
 	defer pChain.Database.Close()
@@ -96,11 +109,18 @@ func (pCLI *CommandLine) createBlockChain_refName(refName string) {
 	pCLI.createBlockChain(address)
 }
 
-func (pCLI *CommandLine) balance(address string) {
-	pChain := blockchain.ContinueBlockChain()
-	defer pChain.Database.Close()
-	balance, _ := pChain.FindUTXOs([]byte(address))
-	fmt.Printf("Address: %s, Balance: %d \n", address, balance)
+//弃用
+// func (pCLI *CommandLine) balance(address string) {
+// 	pChain := blockchain.ContinueBlockChain()
+// 	defer pChain.Database.Close()
+// 	balance, _ := pChain.FindUTXOs([]byte(address))
+// 	fmt.Printf("Address: %s, Balance: %d \n", address, balance)
+// }
+
+func (*CommandLine) balance(address string) {
+	pWallet := wallet.LoadWallet([]byte(address))
+	amount := pWallet.GetBalance()
+	fmt.Printf("Address: %s, Balance: %d\n", address, amount)
 }
 
 func (pCLI *CommandLine) balance_refName(refName string) {
@@ -122,9 +142,11 @@ func (pCLI *CommandLine) getBlockChainInfo() {
 		fmt.Println("----------------------------------------------------")
 		fmt.Printf("Timestamp: %d\n", pBlock.Timestamp)
 		fmt.Printf("Previous hash: %x\n", pBlock.PrevHash)
+		fmt.Printf("Height: %d\n", pBlock.Height)
 		fmt.Printf("Transaction: %v\n", pBlock.Transactions)
 		fmt.Printf("hash: %x\n", pBlock.Hash)
 		fmt.Printf("Pow: %s\n", strconv.FormatBool(pBlock.ValidatePoW()))
+		fmt.Printf("MTree's root hash: %x\n", pBlock.MTree.RootNode.HashData)
 		fmt.Println("----------------------------------------------------")
 		fmt.Println()
 	}
@@ -160,8 +182,15 @@ func (pCLI *CommandLine) mine() {
 	pChain := blockchain.ContinueBlockChain()
 	defer pChain.Database.Close()
 
-	pChain.RunMine()
+	ok := pChain.RunMine()
 	fmt.Println("Finish Mining")
+	if ok {
+		pRefList := wallet.LoadRefList()
+		for addr := range *pRefList {
+			pChain.UpdateUTXOSet([]byte(addr))
+		}
+	}
+	fmt.Println("Finish updating UTXO sets")
 }
 
 func (pCLI *CommandLine) validataArgs() {
@@ -209,6 +238,8 @@ func (pCLI *CommandLine) Run() {
 		} else {
 			pCLI.createBlockChain(*pAddress)
 		}
+	case "initutxoset":
+		pCLI.initUTXOSet()
 	case "balance":
 		flagSet := flag.NewFlagSet("createblockchain", flag.ExitOnError)
 		pAddress := flagSet.String("address", "", "Which address's balance you would query")

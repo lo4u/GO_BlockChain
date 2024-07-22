@@ -11,4 +11,5 @@ const (
 	NETWORKVERSION      = byte(0x00)
 	WALLETSDIR          = "./tmp/wallets/"
 	WALLETSREFLIST      = "./tmp/ref_list/"
+	UTXOSET             = "./tmp/utxoset/"
 )

@@ -64,22 +64,22 @@ func (pBlockChain *BlockChain) VerifyTransactions(txs []*transaction.Transaction
 	}
 	return true
 }
-func (pBlockChain *BlockChain) RunMine() {
+func (pBlockChain *BlockChain) RunMine() bool {
 	pTransactionPool := CreateTransactionPool()
 	if !pBlockChain.VerifyTransactions(pTransactionPool.PubTx) {
 		log.Println("falls in transaction verification")
 		err := RemoveTransactionPoolFile()
 		utils.Handle(err)
-		return
+		return false
 	}
-	pCandidateBlock := CreateBlock(pBlockChain.LastHash, pTransactionPool.PubTx)
+	pCandidateBlock := CreateBlock(pBlockChain.LastHash, pBlockChain.GetHeight()+1, pTransactionPool.PubTx)
 	if pCandidateBlock.ValidatePoW() {
 		pBlockChain.AddBlock(pCandidateBlock)
 		err := RemoveTransactionPoolFile()
 		utils.Handle(err)
-		return
+		return true
 	} else {
 		fmt.Println("Block has invalid nonce")
-		return
+		return false
 	}
 }

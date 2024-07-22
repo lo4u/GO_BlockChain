@@ -89,9 +89,10 @@ var transactionTests = []struct {
 	},
 }
 
+// 这里需要修改
 func GenerateBlock(txs []*transaction.Transaction, prevBlock string) *blockchain.Block {
 	prevBlockHash := sha256.Sum256([]byte(prevBlock))
-	testblock := blockchain.CreateBlock(prevBlockHash[:], txs)
+	testblock := blockchain.CreateBlock(prevBlockHash[:], 0, txs)
 	return testblock
 }
 

@@ -5,10 +5,9 @@ import (
 	"GOPreject/merkletree"
 	"GOPreject/transaction"
 	"GOPreject/utils"
-	"encoding/gob"
-
 	"bytes"
 	"crypto/sha256"
+	"encoding/gob"
 	"time"
 )
 
@@ -16,6 +15,7 @@ type Block struct {
 	Timestamp    int64                      //创建的时间戳
 	Hash         []byte                     //自己的摘要值
 	PrevHash     []byte                     //前一个区块的摘要
+	Height       int64                      //区块高度
 	Target       []byte                     //工作目标值，用于POW
 	Nonce        int64                      //工作计算的结果
 	MTree        *merkletree.MerkleTree     //merkleTree结构
@@ -43,8 +43,8 @@ func (pBlock *Block) SetHash() {
 	pBlock.Hash = hash[:]
 }
 
-func CreateBlock(prevHash []byte, transactions []*transaction.Transaction) *Block {
-	block := Block{time.Now().Unix(), []byte{}, prevHash, []byte{}, 0, merkletree.CreateMerkleTree(transactions), transactions}
+func CreateBlock(prevHash []byte, height int64, transactions []*transaction.Transaction) *Block {
+	block := Block{time.Now().Unix(), []byte{}, prevHash, height, []byte{}, 0, merkletree.CreateMerkleTree(transactions), transactions}
 	block.Target = block.GetTarget()
 	block.Nonce = block.FindNonce()
 	block.SetHash()
@@ -53,7 +53,7 @@ func CreateBlock(prevHash []byte, transactions []*transaction.Transaction) *Bloc
 
 // 生成初始区块
 func GenesisBlock(address []byte) *Block {
-	block := CreateBlock([]byte(constcoe.PREVHASH), []*transaction.Transaction{transaction.BaseTx(address)})
+	block := CreateBlock([]byte(constcoe.PREVHASH), 0, []*transaction.Transaction{transaction.BaseTx(address)})
 	block.SetHash()
 	return block
 }

@@ -9,6 +9,7 @@
 ./main.exe walletlist
 ./main.exe createblockchain -refname LeoCao
 ./main.exe blockchaininfo
+./main.exe initutxoset
 ./main.exe balance -refname LeoCao
 ./main.exe sendbyname -from LeoCao -to Krad -amount 100
 ./main.exe balance -refname Krad

@@ -14,3 +14,4 @@ mkdir tmp
 mkdir tmp/wallets
 mkdir tmp/ref_list
 mkdir tmp/blocks
+mkdir tmp/utxoset
