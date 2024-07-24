@@ -68,17 +68,17 @@ func (pBlockChain *BlockChain) VerifyTransactions(txs []*transaction.Transaction
 
 // Run mine process and then remove the local transaction pool file.
 func (pBlockChain *BlockChain) RunMine() bool {
-	pTransactionPool := GetTransactionPool()
+	pTransactionPool := transaction.GetTransactionPool()
 	if !pBlockChain.VerifyTransactions(pTransactionPool.PubTx) {
 		log.Println("falls in transaction verification")
-		err := RemoveTransactionPoolFile()
+		err := transaction.RemoveTransactionPoolFile()
 		utils.Handle(err)
 		return false
 	}
 	pCandidateBlock := CreateBlock(pBlockChain.LastHash, pBlockChain.GetHeight()+1, pTransactionPool.PubTx)
 	if pCandidateBlock.ValidatePoW() {
 		pBlockChain.AddBlock(pCandidateBlock)
-		err := RemoveTransactionPoolFile()
+		err := transaction.RemoveTransactionPoolFile()
 		utils.Handle(err)
 		return true
 	} else {

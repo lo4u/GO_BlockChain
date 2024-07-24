@@ -2,6 +2,7 @@ package cli
 
 import (
 	"GOPreject/blockchain"
+	"GOPreject/transaction"
 	"GOPreject/utils"
 	"GOPreject/wallet"
 	"flag"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"text/tabwriter"
 )
 
 type CommandLine struct {
@@ -23,18 +25,40 @@ func (pCLI *CommandLine) printUsage() {
 	fmt.Println("In addition, don't forget to run mine function after transactions are collected.")
 	fmt.Println("Please make sure the UTXO set init before querying the balance of a wallet")
 	fmt.Println("------------------------------------------------------------------------------------------------------------------")
-	fmt.Println("createwallet -refname REFNAME				---->Creates and save a wallet. The refname is optional.")
-	fmt.Println("walletinfo -refname NAME -address ADDRESS				---->Print the information of a wallet. At least one of the refname and address is supplied.")
-	fmt.Println("walletupdate					---->Register and update all the wallets (especially when you add an existed .wlt file).")
-	fmt.Println("walletlist					---->List all the wallets found (make sure you have run walletupdate first).")
-	fmt.Println("createblockchain -refname NAME -address ADDRESS					---->Creates a blockchain with the owner you input (address or refname).")
-	fmt.Println("initutxoset					---->Init all the UTXO sets of known wallets")
-	fmt.Println("balance -refname REFNAME -address ADDRESS					---->Query the balance of the address or refname you input")
-	fmt.Println("blockchaininfo							---->Prints the blocksin the blockchain")
-	fmt.Println("sendbyname -from FROMNAME -to TONAME -amount AMOUNT		---->Make a transaction and put it into candidate block, by refname")
-	fmt.Println("send -from FROMADDRESS -to TOADDRESS -amount AMOUNT					----Make a transaction and put it into candidate block")
-	fmt.Println("mine								---->Mine and add a block to the chain")
-	fmt.Println("------------------------------------------------------------------------------------------------------------------")
+
+	outStream := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	commands := []struct {
+		com  string
+		desc string
+	}{
+		{"createwallet -refname REFNAME", "Creates and save a wallet. The refname is optional."},
+		{"walletinfo -refname NAME -address ADDRESS", "Print the information of a wallet. At least one of the refname and address is supplied."},
+		{"walletupdate", "Register and update all the wallets (especially when you add an existed .wlt file)."},
+		{"walletlist", "List all the wallets found (make sure you have run walletupdate first)."},
+		{"createblockchain -refname NAME -address ADDRESS", "Creates a blockchain with the owner you input (address or refname)."},
+		{"initutxoset", "Init all the UTXO sets of known wallets."},
+		{"balance -refname REFNAME -address ADDRESS", "Query the balance of the address or refname you input."},
+		{"blockchaininfo", "Prints the blocks in the blockchain."},
+		{"sendbyname -from FROMNAME -to TONAME -amount AMOUNT", "Make a transaction and put it into candidate block, by refname."},
+		{"send -from FROMADDRESS -to TOADDRESS -amount AMOUNT", "Make a transaction and put it into candidate block."},
+		{"mine", "Mine and add a block to the chain."},
+	}
+	for _, cmd := range commands {
+		fmt.Fprintf(outStream, "%s\t\t\t---->\t%s\n", cmd.com, cmd.desc)
+	}
+	outStream.Flush()
+	// fmt.Println("createwallet -refname REFNAME				---->Creates and save a wallet. The refname is optional.")
+	// fmt.Println("walletinfo -refname NAME -address ADDRESS				---->Print the information of a wallet. At least one of the refname and address is supplied.")
+	// fmt.Println("walletupdate					---->Register and update all the wallets (especially when you add an existed .wlt file).")
+	// fmt.Println("walletlist					---->List all the wallets found (make sure you have run walletupdate first).")
+	// fmt.Println("createblockchain -refname NAME -address ADDRESS					---->Creates a blockchain with the owner you input (address or refname).")
+	// fmt.Println("initutxoset					---->Init all the UTXO sets of known wallets")
+	// fmt.Println("balance -refname REFNAME -address ADDRESS					---->Query the balance of the address or refname you input")
+	// fmt.Println("blockchaininfo							---->Prints the blocksin the blockchain")
+	// fmt.Println("sendbyname -from FROMNAME -to TONAME -amount AMOUNT		---->Make a transaction and put it into candidate block, by refname")
+	// fmt.Println("send -from FROMADDRESS -to TOADDRESS -amount AMOUNT					----Make a transaction and put it into candidate block")
+	// fmt.Println("mine								---->Mine and add a block to the chain")
+	// fmt.Println("------------------------------------------------------------------------------------------------------------------")
 }
 
 func (pCLI *CommandLine) createWallet(refName string) {
@@ -161,7 +185,7 @@ func (*CommandLine) send(from, to string, amount int) {
 		fmt.Println("Failed to create transaction.")
 		return
 	}
-	pTP := blockchain.GetTransactionPool()
+	pTP := transaction.GetTransactionPool()
 	pTP.AddTransaction(pTx)
 	pTP.SaveFile()
 	fmt.Println("Success!")

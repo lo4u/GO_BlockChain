@@ -1,8 +1,7 @@
-package blockchain
+package transaction
 
 import (
 	"GOPreject/constcoe"
-	"GOPreject/transaction"
 	"GOPreject/utils"
 	"bytes"
 	"encoding/gob"
@@ -10,7 +9,7 @@ import (
 )
 
 type TransactionPool struct {
-	PubTx []*transaction.Transaction
+	PubTx []*Transaction
 }
 
 // Load the local transaction pool file. If nothing found, create a new one.
@@ -28,7 +27,7 @@ func RemoveTransactionPoolFile() error {
 }
 
 // Add a transaction to the pool.
-func (tp *TransactionPool) AddTransaction(tx *transaction.Transaction) {
+func (tp *TransactionPool) AddTransaction(tx *Transaction) {
 	tp.PubTx = append(tp.PubTx, tx)
 }
 
