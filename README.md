@@ -1,0 +1,1 @@
+A blockchain project with go developed in study. The original auther's artical is [深入底层：Go语言从零构建区块链](https://www.zhihu.com/column/c_1425139266972626944)
