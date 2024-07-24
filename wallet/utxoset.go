@@ -10,22 +10,26 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
-func (wallet *Wallet) GetUTXOSetDir() string {
+// Return the directory where the UTXO set file is located
+func (wallet *Wallet) GetUTXOSetDirName() string {
 	address_str := string(wallet.Address())
 	path := constcoe.UTXOSET + address_str
 	return path
 }
 
+// Return a pointer to the wallet's UTXO set object loaded from the local file
 func (wt *Wallet) LoadUTXOSet() *utxoset.UTXOSet {
-	return utxoset.LoadUTXOSet(wt.GetUTXOSetDir())
+	return utxoset.LoadUTXOSet(wt.GetUTXOSetDirName())
 }
 
+// Remove the local UTXO set file
 func (pWallet *Wallet) RemoveUTXOSet() error {
-	file := pWallet.GetUTXOSetDir()
+	file := pWallet.GetUTXOSetDirName()
 	err := os.Remove(file)
 	return err
 }
 
+// Return the wallet's balance by local UTXO set
 func (pWallet *Wallet) GetBalance() int {
 	balance := 0
 	pUTXOSet := pWallet.LoadUTXOSet()

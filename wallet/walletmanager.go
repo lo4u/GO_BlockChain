@@ -12,19 +12,10 @@ import (
 	"strings"
 )
 
+// key --> address, value --> refname. Refname is repeatable, even empty, like "".
 type RefList map[string]string
 
-func (refList *RefList) Save() {
-	var buf bytes.Buffer
-	encoder := gob.NewEncoder(&buf)
-	err := encoder.Encode(refList)
-	utils.Handle(err)
-
-	file := constcoe.WALLETSREFLIST + "ref_list.data"
-	err = os.WriteFile(file, buf.Bytes(), 0644)
-	utils.Handle(err)
-}
-
+// Load a reflist from the local file named "ref_list.data"
 func LoadRefList() *RefList {
 	file := constcoe.WALLETSREFLIST + "ref_list.data"
 	if !utils.FileExists(file) {
@@ -43,6 +34,22 @@ func LoadRefList() *RefList {
 	}
 }
 
+// Save the reflist as a local file named "ref_list.data"
+func (refList *RefList) Save() {
+	var buf bytes.Buffer
+	encoder := gob.NewEncoder(&buf)
+	err := encoder.Encode(refList)
+	utils.Handle(err)
+
+	file := constcoe.WALLETSREFLIST + "ref_list.data"
+	err = os.WriteFile(file, buf.Bytes(), 0644)
+	utils.Handle(err)
+}
+
+// Update the reflist object
+//
+// For those existing in reflist, this function will do nothing.
+// And other wallets will be added to the reflist with a empty string as refname
 func (refList *RefList) Update() {
 	err := filepath.Walk(constcoe.WALLETSDIR, func(path string, info fs.FileInfo, err error) error {
 		if (info == nil) || (info.IsDir()) || strings.Compare(filepath.Ext(path), ".wlt") != 0 {
@@ -60,10 +67,12 @@ func (refList *RefList) Update() {
 	utils.Handle(err)
 }
 
+// Bind a refname to a address in the reflist.
 func (refList *RefList) BindRef(address, refName string) {
 	(*refList)[address] = refName
 }
 
+// Find a address attached to a refname. This function acts like finding key by value.
 func (refList *RefList) FindAddress(refName string) (string, error) {
 	for key, val := range *refList {
 		if val == refName && key != "" {

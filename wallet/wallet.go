@@ -13,51 +13,32 @@ import (
 	"os"
 )
 
+// a struct of wallet, consisting of two fields
 type Wallet struct {
 	PrivateKey ecdsa.PrivateKey
 	PublicKey  []byte
 }
 
-func NewKeyPair() (ecdsa.PrivateKey, []byte) {
+// Generate a pair of secp256r1 keys
+func newKeyPair() (ecdsa.PrivateKey, []byte) {
 	curve := elliptic.P256()
 
-	privateKey, err := ecdsa.GenerateKey(curve, rand.Reader)
+	pPrivateKey, err := ecdsa.GenerateKey(curve, rand.Reader)
 	utils.Handle(err)
-	publicKey := append(privateKey.PublicKey.X.Bytes(), privateKey.PublicKey.Y.Bytes()...)
-	return *privateKey, publicKey
+	publicKey := append(pPrivateKey.PublicKey.X.Bytes(), pPrivateKey.PublicKey.Y.Bytes()...)
+	return *pPrivateKey, publicKey
 }
 
+// Return a pointer for a new wallet object
 func NewWallet() *Wallet {
-	privateKey, pubKey := NewKeyPair()
+	privateKey, pubKey := newKeyPair()
 	return &Wallet{
 		PrivateKey: privateKey,
 		PublicKey:  pubKey,
 	}
 }
 
-func (w *Wallet) Address() []byte {
-	pubKeyHash := utils.PubKeyHash(w.PublicKey)
-	return utils.PubHash2Address(pubKeyHash)
-}
-
-func (w *Wallet) Save() {
-	gob.Register(elliptic.P256())
-
-	var buf bytes.Buffer
-	encoder := gob.NewEncoder(&buf)
-	privPubKey := struct {
-		D big.Int
-		X big.Int
-		Y big.Int
-	}{*w.PrivateKey.D, *w.PrivateKey.PublicKey.X, *w.PrivateKey.PublicKey.Y}
-	err := encoder.Encode(&privPubKey)
-	utils.Handle(err)
-
-	file := constcoe.WALLETSDIR + string(w.Address()) + ".wlt"
-	err = os.WriteFile(file, buf.Bytes(), 0644)
-	utils.Handle(err)
-}
-
+// Load a wallet from the local file corresponding to the given address
 func LoadWallet(address []byte) *Wallet {
 	file := constcoe.WALLETSDIR + string(address) + ".wlt"
 	if !utils.FileExists(file) {
@@ -82,4 +63,29 @@ func LoadWallet(address []byte) *Wallet {
 	w.PrivateKey.PublicKey.Y = &privPubKey.Y
 	w.PublicKey = append(w.PrivateKey.PublicKey.X.Bytes(), w.PrivateKey.PublicKey.Y.Bytes()...)
 	return &w
+}
+
+// Return address of the caller wallet, which comes from the wallet's public key
+func (w *Wallet) Address() []byte {
+	pubKeyHash := utils.PubKeyHash(w.PublicKey)
+	return utils.PubHash2Address(pubKeyHash)
+}
+
+// Save the wallet as a local file, which's file name is the wallet's address
+func (w *Wallet) Save() {
+	gob.Register(elliptic.P256())
+
+	var buf bytes.Buffer
+	encoder := gob.NewEncoder(&buf)
+	privPubKey := struct {
+		D big.Int
+		X big.Int
+		Y big.Int
+	}{*w.PrivateKey.D, *w.PrivateKey.PublicKey.X, *w.PrivateKey.PublicKey.Y}
+	err := encoder.Encode(&privPubKey)
+	utils.Handle(err)
+
+	file := constcoe.WALLETSDIR + string(w.Address()) + ".wlt"
+	err = os.WriteFile(file, buf.Bytes(), 0644)
+	utils.Handle(err)
 }

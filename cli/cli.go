@@ -161,7 +161,7 @@ func (*CommandLine) send(from, to string, amount int) {
 		fmt.Println("Failed to create transaction.")
 		return
 	}
-	pTP := blockchain.CreateTransactionPool()
+	pTP := blockchain.GetTransactionPool()
 	pTP.AddTransaction(pTx)
 	pTP.SaveFile()
 	fmt.Println("Success!")

@@ -20,17 +20,21 @@ const (
 )
 
 type UTXOSet struct {
-	Name   []byte //标识符
-	DB     *badger.DB
-	Height int64
+	Name   []byte     //标识符
+	DB     *badger.DB //dump database object
+	Height int64      //corresponds to the blockchain's height
 }
 
-func GetUTXOSetFile(dir string) string {
+// Turn the directory string to the database file name string
+//
+// Only to be used to check if the file exists
+func getUTXOSetFileName(dir string) string {
 	fileAddress := dir + "/" + "MANIFEST"
 	return fileAddress
 }
 
-func ToUTXOKey(txID []byte, order int) []byte {
+// Return UTXO's key used to write in database
+func toUTXOKey(txID []byte, order int) []byte {
 	utxoKey := bytes.Join([][]byte{
 		[]byte(UTXOKEY),
 		txID,
@@ -40,8 +44,9 @@ func ToUTXOKey(txID []byte, order int) []byte {
 	return utxoKey
 }
 
+// Based on the obtained UTXO set, Create a UTXO set file and return its object's pointer
 func CreateUTXOSet(name []byte, dir string, utxos []transaction.UTXO, height int64) *UTXOSet {
-	if utils.FileExists(GetUTXOSetFile(dir)) {
+	if utils.FileExists(getUTXOSetFileName(dir)) {
 		fmt.Println("UTXOSet has already existed, now rebuild it.")
 		err := os.RemoveAll(dir)
 		utils.Handle(err)
@@ -64,7 +69,7 @@ func CreateUTXOSet(name []byte, dir string, utxos []transaction.UTXO, height int
 			return err
 		}
 		for _, utxo := range utxos {
-			utxoKey := ToUTXOKey(utxo.TxID, utxo.OutIdx)
+			utxoKey := toUTXOKey(utxo.TxID, utxo.OutIdx)
 			err = txn.Set(utxoKey, utxo.Serialize())
 			if err != nil {
 				return err
@@ -76,8 +81,11 @@ func CreateUTXOSet(name []byte, dir string, utxos []transaction.UTXO, height int
 	return &utxoSet
 }
 
+// Load a UTXO set specified by dir.
+//
+// Note: the dir is which the MANIFEST file is located in
 func LoadUTXOSet(dir string) *UTXOSet {
-	if !utils.FileExists(GetUTXOSetFile(dir)) {
+	if !utils.FileExists(getUTXOSetFileName(dir)) {
 		fmt.Println("No UTXOSet found, please create one first.")
 		runtime.Goexit()
 	}
@@ -123,7 +131,7 @@ func LoadUTXOSet(dir string) *UTXOSet {
 
 func (utxoSet *UTXOSet) AddUTXO(utxo *transaction.UTXO) {
 	err := utxoSet.DB.Update(func(txn *badger.Txn) error {
-		utxoKey := ToUTXOKey(utxo.TxID, utxo.OutIdx)
+		utxoKey := toUTXOKey(utxo.TxID, utxo.OutIdx)
 		err := txn.Set(utxoKey, utxo.Serialize())
 		if err != nil {
 			return err
@@ -135,7 +143,7 @@ func (utxoSet *UTXOSet) AddUTXO(utxo *transaction.UTXO) {
 
 func (utxoSet *UTXOSet) DelUTXO(txID []byte, order int) {
 	err := utxoSet.DB.Update(func(txn *badger.Txn) error {
-		utxoKey := ToUTXOKey(txID, order)
+		utxoKey := toUTXOKey(txID, order)
 		err := txn.Delete(utxoKey)
 		return err
 	})

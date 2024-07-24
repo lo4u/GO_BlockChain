@@ -15,18 +15,29 @@ type TxOutput struct {
 }
 
 type TxInput struct {
-	TxID   []byte //前一个交易的ID
-	OutIdx int    //前一个交易中，指示这个Input是第几个输出
+	TxID   []byte //source transaction's ID
+	OutIdx int    //in souorce transaction
 	PubKey []byte
 	Sign   []byte
 }
 
+func Deserialize(data []byte) *UTXO {
+	pUtxo := new(UTXO)
+	pBuf := bytes.NewBuffer(data)
+	decoder := gob.NewDecoder(pBuf)
+	err := decoder.Decode(pUtxo)
+	utils.Handle(err)
+	return pUtxo
+}
+
+// Check if the input's source UTXO belongs to the specified address.
 func (in *TxInput) FromAddressEqual(address []byte) bool {
 	inAddress := utils.PubKeyHash(in.PubKey)
 	inAddress = utils.PubHash2Address(inAddress)
 	return bytes.Equal(inAddress, address)
 }
 
+// Check if the output belongs to the specified address.
 func (out *TxOutput) ToAddressEqual(address []byte) bool {
 	return bytes.Equal(utils.PubHash2Address(out.HashPubKey), address)
 }
@@ -43,13 +54,4 @@ func (utxo *UTXO) Serialize() []byte {
 	err := encoder.Encode(utxo)
 	utils.Handle(err)
 	return res.Bytes()
-}
-
-func Deserialize(data []byte) *UTXO {
-	pUtxo := new(UTXO)
-	pBuf := bytes.NewBuffer(data)
-	decoder := gob.NewDecoder(pBuf)
-	err := decoder.Decode(pUtxo)
-	utils.Handle(err)
-	return pUtxo
 }

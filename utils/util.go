@@ -83,7 +83,6 @@ func Address2PubHash(address []byte) []byte {
 	return pubKeyHash
 }
 
-// 签名函数
 func Sign(msg []byte, privKey ecdsa.PrivateKey) []byte {
 	r, s, err := ecdsa.Sign(rand.Reader, &privKey, msg)
 	Handle(err)

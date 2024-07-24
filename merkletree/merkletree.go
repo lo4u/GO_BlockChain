@@ -16,7 +16,7 @@ type MerkleNode struct {
 	HashData  []byte
 }
 
-func CreateNode(left, right *MerkleNode) *MerkleNode {
+func createNode(left, right *MerkleNode) *MerkleNode {
 	tempNode := MerkleNode{}
 
 	catenateHash := append(left.HashData, right.HashData...)
@@ -27,7 +27,7 @@ func CreateNode(left, right *MerkleNode) *MerkleNode {
 	return &tempNode
 }
 
-func CreateLeaf(hashData []byte) *MerkleNode {
+func createLeaf(hashData []byte) *MerkleNode {
 	return &MerkleNode{
 		LeftNode:  nil,
 		RightNode: nil,
@@ -45,7 +45,7 @@ func CreateMerkleTree(txs []*transaction.Transaction) *MerkleTree {
 	nodePool := make([]*MerkleNode, 0, txsLen)
 
 	for _, tx := range txs {
-		nodePool = append(nodePool, CreateLeaf(tx.ID))
+		nodePool = append(nodePool, createLeaf(tx.ID))
 	}
 	for len(nodePool) > 1 {
 		poolLen := len(nodePool)
@@ -55,13 +55,33 @@ func CreateMerkleTree(txs []*transaction.Transaction) *MerkleTree {
 			tempNodePool = append(tempNodePool, nodePool[poolLen-1])
 		}
 		for i := 0; i < poolLen/2; i++ {
-			tempNodePool = append(tempNodePool, CreateNode(nodePool[2*i], nodePool[2*i+1]))
+			tempNodePool = append(tempNodePool, createNode(nodePool[2*i], nodePool[2*i+1]))
 		}
 		nodePool = tempNodePool
 	}
 	return &MerkleTree{nodePool[0]}
 }
 
+// simple payment verification
+func SPV(txid, mtRootHash []byte, route []int, hashRoute [][]byte) bool {
+	routeLen := len(route)
+	tempHash := txid
+
+	for i := routeLen - 1; i >= 0; i-- {
+		if route[i] == 0 {
+			catenateHash := append(tempHash, hashRoute[i]...)
+			hash := sha256.Sum256(catenateHash)
+			tempHash = hash[:]
+		} else {
+			catenateHash := append(hashRoute[i], tempHash...)
+			hash := sha256.Sum256(catenateHash)
+			tempHash = hash[:]
+		}
+	}
+	return bytes.Equal(tempHash, mtRootHash)
+}
+
+// A recursive function called by next function.
 func (merkleNode *MerkleNode) Find(data []byte, route []int, hashRoute [][]byte) (bool, []int, [][]byte) {
 	findFlag := false
 
@@ -93,26 +113,10 @@ func (merkleNode *MerkleNode) Find(data []byte, route []int, hashRoute [][]byte)
 	}
 }
 
+// Search for a hash data. Return a boolean value, a int slice navigate through the tree,
+// and a hash's slice([ ][ ]byte) storing the SPV path.
 func (merkleTree *MerkleTree) Find(hashData []byte) (bool, []int, [][]byte) {
 	var route []int
 	var hashRoute [][]byte
 	return merkleTree.RootNode.Find(hashData, route, hashRoute)
-}
-
-func SPV(txid, mtRootHash []byte, route []int, hashRoute [][]byte) bool {
-	routeLen := len(route)
-	tempHash := txid
-
-	for i := routeLen - 1; i >= 0; i-- {
-		if route[i] == 0 {
-			catenateHash := append(tempHash, hashRoute[i]...)
-			hash := sha256.Sum256(catenateHash)
-			tempHash = hash[:]
-		} else {
-			catenateHash := append(hashRoute[i], tempHash...)
-			hash := sha256.Sum256(catenateHash)
-			tempHash = hash[:]
-		}
-	}
-	return bytes.Equal(tempHash, mtRootHash)
 }

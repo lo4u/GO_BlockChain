@@ -16,16 +16,38 @@ import (
 
 type BlockChain struct {
 	LastHash []byte
-	Database *badger.DB //块指针的切片
+	Database *badger.DB
 }
 
+// It is like C++'s iterator object. However, there are a few function implemented.
 type BlockChainIterator struct {
 	CurrentHash []byte
 	Database    *badger.DB
 }
 
+// a new iterator points to the newest block.
 func (blockChain *BlockChain) NewIterator() *BlockChainIterator {
 	iterator := BlockChainIterator{blockChain.LastHash, blockChain.Database}
+	return &iterator
+}
+
+// Return a iterator which points to the initial block's previous address.
+func (pBlockChain *BlockChain) End() *BlockChainIterator {
+	var ogPrevHash []byte
+
+	err := pBlockChain.Database.View(func(txn *badger.Txn) error {
+		item, err := txn.Get([]byte("ogprevhash"))
+		utils.Handle(err)
+		err = item.Value(func(val []byte) error {
+			ogPrevHash = val
+			return nil
+		})
+		utils.Handle(err)
+		return nil
+	})
+	utils.Handle(err)
+
+	iterator := BlockChainIterator{ogPrevHash, pBlockChain.Database}
 	return &iterator
 }
 
@@ -48,30 +70,11 @@ func (iterator *BlockChainIterator) Next() *Block {
 	return pBlock
 }
 
-// 类似c++的迭代器，End()返回最后一个的后一个
-func (pBlockChain *BlockChain) End() *BlockChainIterator {
-	var ogPrevHash []byte
-
-	err := pBlockChain.Database.View(func(txn *badger.Txn) error {
-		item, err := txn.Get([]byte("ogprevhash"))
-		utils.Handle(err)
-		err = item.Value(func(val []byte) error {
-			ogPrevHash = val
-			return nil
-		})
-		utils.Handle(err)
-		return nil
-	})
-	utils.Handle(err)
-
-	iterator := BlockChainIterator{ogPrevHash, pBlockChain.Database}
-	return &iterator
-}
-
 func (iter1 *BlockChainIterator) Equal(iter2 *BlockChainIterator) bool {
 	return bytes.Equal(iter1.CurrentHash, iter2.CurrentHash) && (iter1.Database == iter2.Database)
 }
 
+// Add a block to the blockchain
 func (pBlockChain *BlockChain) AddBlock(newBlock *Block) {
 	var lastHash []byte
 
@@ -86,7 +89,6 @@ func (pBlockChain *BlockChain) AddBlock(newBlock *Block) {
 		return nil
 	})
 	utils.Handle(err)
-	// fmt.Println(lastHash)
 	if !bytes.Equal(newBlock.PrevHash, lastHash) {
 		fmt.Println("This block is out of order")
 		runtime.Goexit()
@@ -103,7 +105,7 @@ func (pBlockChain *BlockChain) AddBlock(newBlock *Block) {
 	utils.Handle(err)
 }
 
-// 需要手动关闭区块链的数据库
+// initialize a blockchain and give a original fund to the specified address
 func InitBlockChain(address []byte) *BlockChain {
 	var lashHash []byte
 
@@ -112,9 +114,7 @@ func InitBlockChain(address []byte) *BlockChain {
 		runtime.Goexit()
 	}
 
-	//创建一个数据库操作对象
 	opts := badger.DefaultOptions(constcoe.BCPATH)
-	//数据库信息不输出到标准输出中，打开可以方便调试
 	opts.Logger = nil
 
 	db, err := badger.Open(opts)
@@ -141,7 +141,7 @@ func InitBlockChain(address []byte) *BlockChain {
 	return &blockchain
 }
 
-// 似乎缺少一个关闭并储存区块链的函数？
+// Load the local blockchain file
 func ContinueBlockChain() *BlockChain {
 	if !utils.FileExists(constcoe.BCFILE) {
 		fmt.Println("No blockchain found, please create one firse")
@@ -171,6 +171,7 @@ func ContinueBlockChain() *BlockChain {
 	return &chain
 }
 
+// Find all transactions those include UTXO. Return these transaction as a pointer slice.
 func (pBlockChain *BlockChain) FindUTXs(address []byte) []*transaction.Transaction {
 	var UTX []*transaction.Transaction //所有 存在输出未被使用的交易（记录）
 	STXO := make(map[string][]int)     //已使用的交易输出
@@ -217,29 +218,32 @@ func (pBlockChain *BlockChain) FindUTXs(address []byte) []*transaction.Transacti
 	return UTX
 }
 
-// 弃用
-func (pBlockChain *BlockChain) FindUTXOs(address []byte) (int, map[string]int) {
-	unspentOut := make(map[string]int)
-	//用FindUTX找到未使用的交易输出所在的交易
-	unspentTX := pBlockChain.FindUTXs(address)
-	//计算余额
-	sum := 0
+// Discarded
+// func (pBlockChain *BlockChain) FindUTXOs(address []byte) (int, map[string]int) {
+// 	unspentOut := make(map[string]int)
+// 	//用FindUTX找到未使用的交易输出所在的交易
+// 	unspentTX := pBlockChain.FindUTXs(address)
+// 	//计算余额
+// 	sum := 0
+//
+// Work:
+// 	for _, ptx := range unspentTX {
+// 		txID := hex.EncodeToString(ptx.ID)
+// 		for outIdx, out := range ptx.Outputs {
+// 			if out.ToAddressEqual(address) {
+// 				unspentOut[txID] = outIdx
+// 				sum += out.Value
+// 				continue Work
+// 			}
+// 		}
+// 	}
+//
+// 	return sum, unspentOut
+// }
 
-Work:
-	for _, ptx := range unspentTX {
-		txID := hex.EncodeToString(ptx.ID)
-		for outIdx, out := range ptx.Outputs {
-			if out.ToAddressEqual(address) {
-				unspentOut[txID] = outIdx
-				sum += out.Value
-				continue Work
-			}
-		}
-	}
-
-	return sum, unspentOut
-}
-
+// Search for avaliable UTXOs. Return the money amount found and a map of transaction ID and corresponding output index.
+//
+// Note: the amount returned might be less than required amount, if the sum of all UTXOs is limited.
 func (pBlockChain *BlockChain) FindSpendableOutputs(address []byte, amount int) (int, map[string]int) {
 	unspentOut := make(map[string]int)
 	//用FindUTX找到未使用的交易输出所在的交易
@@ -266,12 +270,16 @@ Work:
 	return sum, unspentOut
 }
 
-func (pBlockChain *BlockChain) CreateTransaction(from, to []byte, amount int) (*transaction.Transaction, bool) {
+// Create a Transaction and return a boolean value indicating whether the creation was successful.
+//
+// Note: this function retrive the private key automatically and perform the signing process,
+// without requiring the caller to explicitly provide it.
+func (pBlockChain *BlockChain) CreateTransaction(fromAddress, toAddress []byte, amount int) (*transaction.Transaction, bool) {
 	var inputs []transaction.TxInput
 	var outputs []transaction.TxOutput
-	fromWallet := wallet.LoadWallet(from)
+	fromWallet := wallet.LoadWallet(fromAddress)
 
-	money, validOutputs := pBlockChain.FindSpendableOutputs(from, amount)
+	money, validOutputs := pBlockChain.FindSpendableOutputs(fromAddress, amount)
 	if money < amount {
 		fmt.Printf("Not enougn coins!\n")
 		return &transaction.Transaction{}, false
@@ -291,13 +299,13 @@ func (pBlockChain *BlockChain) CreateTransaction(from, to []byte, amount int) (*
 
 	outputs = append(outputs, transaction.TxOutput{
 		Value:      amount,
-		HashPubKey: utils.Address2PubHash(to),
+		HashPubKey: utils.Address2PubHash(toAddress),
 	})
 	//如果有多，就打给自己
 	if money > amount {
 		outputs = append(outputs, transaction.TxOutput{
 			Value:      money - amount,
-			HashPubKey: utils.Address2PubHash(from),
+			HashPubKey: utils.Address2PubHash(fromAddress),
 		})
 	}
 
@@ -312,6 +320,7 @@ func (pBlockChain *BlockChain) CreateTransaction(from, to []byte, amount int) (*
 	return &tx, true
 }
 
+// Get the newest block
 func (blockChain *BlockChain) GetCurrentBlock() *Block {
 	var block *Block
 	err := blockChain.Database.View(func(txn *badger.Txn) error {
@@ -329,10 +338,12 @@ func (blockChain *BlockChain) GetCurrentBlock() *Block {
 	return block
 }
 
+// Get the height of current block. The initial block's height is 0.
 func (blockChain *BlockChain) GetHeight() int64 {
 	return blockChain.GetCurrentBlock().Height
 }
 
+// On this blockchain, find all UTXOs and concatenate a slice.
 func (pBlockChain *BlockChain) GetUTXOs(address []byte) []transaction.UTXO {
 	var utxos []transaction.UTXO
 	unspentTxs := pBlockChain.FindUTXs(address)
@@ -353,13 +364,16 @@ Work:
 	return utxos
 }
 
+// Create a UTXO set from the blockchain corresponding the specified address.
 func (pBlockChain *BlockChain) CreataUTXOSet(address []byte) *utxoset.UTXOSet {
 	pWallet := wallet.LoadWallet(address)
 	utxos := pBlockChain.GetUTXOs(pWallet.Address())
-	return utxoset.CreateUTXOSet(pWallet.Address(), pWallet.GetUTXOSetDir(), utxos, pBlockChain.GetHeight())
+	return utxoset.CreateUTXOSet(pWallet.Address(), pWallet.GetUTXOSetDirName(), utxos, pBlockChain.GetHeight())
 }
 
-// 默认以往的区块不会删除，若是height变化一定是新的区块出现
+// Try to update the UTXO set corresponding the specified address.
+//
+// If the difference in height is greater than one, then a new UTXO set will be created.
 func (pBlockChain *BlockChain) UpdateUTXOSet(address []byte) {
 	pWallet := wallet.LoadWallet(address)
 	utxoSet := pWallet.LoadUTXOSet()

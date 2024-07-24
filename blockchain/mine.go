@@ -21,6 +21,7 @@ func isInputRight(txs []*transaction.Transaction, in transaction.TxInput) (bool,
 	return false, 0
 }
 
+// Verify each transaction
 func (pBlockChain *BlockChain) VerifyTransactions(txs []*transaction.Transaction) bool {
 	if len(txs) == 0 {
 		return true
@@ -64,8 +65,10 @@ func (pBlockChain *BlockChain) VerifyTransactions(txs []*transaction.Transaction
 	}
 	return true
 }
+
+// Run mine process and then remove the local transaction pool file.
 func (pBlockChain *BlockChain) RunMine() bool {
-	pTransactionPool := CreateTransactionPool()
+	pTransactionPool := GetTransactionPool()
 	if !pBlockChain.VerifyTransactions(pTransactionPool.PubTx) {
 		log.Println("falls in transaction verification")
 		err := RemoveTransactionPoolFile()

@@ -9,27 +9,12 @@ import (
 	"encoding/gob"
 )
 
+// Assume that inputs' source address can be repeatable, but outputs' target address can not.
+// And a UTXO from a certain transaction must be used in an upcoming transaction.
 type Transaction struct {
 	ID      []byte //hash值
 	Inputs  []TxInput
 	Outputs []TxOutput
-}
-
-func (tx *Transaction) TxHash() []byte {
-	var encoded bytes.Buffer
-	var hash [32]byte
-
-	//gob是序列化用的，Newcoder接受一个缓冲区用来放序列化的结果
-	encoder := gob.NewEncoder(&encoded)
-	err := encoder.Encode(tx)
-	utils.Handle(err)
-
-	hash = sha256.Sum256(encoded.Bytes())
-	return hash[:]
-}
-
-func (tx *Transaction) SetID() {
-	tx.ID = tx.TxHash()
 }
 
 func BaseTx(toAddress []byte) *Transaction {
@@ -42,12 +27,21 @@ func BaseTx(toAddress []byte) *Transaction {
 	return &tx
 }
 
-func (tx *Transaction) IsBase() bool {
-	return len(tx.Inputs) == 1 && tx.Inputs[0].OutIdx == -1
+func (tx *Transaction) txHash() []byte {
+	var encoded bytes.Buffer
+	var hash [32]byte
+
+	//gob是序列化用的，Newcoder接受一个缓冲区用来放序列化的结果
+	encoder := gob.NewEncoder(&encoded)
+	err := encoder.Encode(tx)
+	utils.Handle(err)
+
+	hash = sha256.Sum256(encoded.Bytes())
+	return hash[:]
 }
 
-// 复制一份交易信息,去掉input的地址和签名
-func (tx *Transaction) PlainCopy() *Transaction {
+// Copy a transaction and remove all inputs' PubKey and Sign.
+func (tx *Transaction) plainCopy() *Transaction {
 	var inputs []TxInput
 	var outputs []TxOutput
 
@@ -73,10 +67,21 @@ func (tx *Transaction) PlainCopy() *Transaction {
 	}
 }
 
-func (tx *Transaction) PlainHash(inIndex int, prevPubKey []byte) []byte {
-	txCopy := tx.PlainCopy()
+// Specify a input, and set its PubKey to prevPubKey. Return the hash of the operation result.
+func (tx *Transaction) plainHash(inIndex int, prevPubKey []byte) []byte {
+	txCopy := tx.plainCopy()
 	txCopy.Inputs[inIndex].PubKey = prevPubKey
-	return txCopy.TxHash()
+	return txCopy.txHash()
+}
+
+// Set a transaction's ID value.
+func (tx *Transaction) SetID() {
+	tx.ID = tx.txHash()
+}
+
+// Check if the transaction is a base transaction.
+func (tx *Transaction) IsBase() bool {
+	return len(tx.Inputs) == 1 && tx.Inputs[0].OutIdx == -1
 }
 
 func (tx *Transaction) Sign(privKey ecdsa.PrivateKey) {
@@ -84,7 +89,7 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey) {
 		return
 	}
 	for idx, input := range tx.Inputs {
-		plainHash := tx.PlainHash(idx, input.PubKey)
+		plainHash := tx.plainHash(idx, input.PubKey)
 		signature := utils.Sign(plainHash, privKey)
 		tx.Inputs[idx].Sign = signature
 	}
@@ -92,7 +97,7 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey) {
 
 func (tx *Transaction) Verify() bool {
 	for index, input := range tx.Inputs {
-		plainHash := tx.PlainHash(index, input.PubKey)
+		plainHash := tx.plainHash(index, input.PubKey)
 		if !utils.Verify(plainHash, input.PubKey, input.Sign) {
 			return false
 		}

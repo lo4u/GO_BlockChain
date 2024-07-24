@@ -13,10 +13,26 @@ type TransactionPool struct {
 	PubTx []*transaction.Transaction
 }
 
+// Load the local transaction pool file. If nothing found, create a new one.
+func GetTransactionPool() *TransactionPool {
+	transactionPool := TransactionPool{}
+	err := transactionPool.LoadFile()
+	utils.Handle(err)
+	return &transactionPool
+}
+
+// remove the local transaction pool file.
+func RemoveTransactionPoolFile() error {
+	err := os.Remove(constcoe.TRANSACTIONPOOLFILE)
+	return err
+}
+
+// Add a transaction to the pool.
 func (tp *TransactionPool) AddTransaction(tx *transaction.Transaction) {
 	tp.PubTx = append(tp.PubTx, tx)
 }
 
+// save the transaction pool as a local file.
 func (tp *TransactionPool) SaveFile() {
 	var content bytes.Buffer
 	encoder := gob.NewEncoder(&content)
@@ -26,6 +42,7 @@ func (tp *TransactionPool) SaveFile() {
 	utils.Handle(err)
 }
 
+// Load a transaction pool file and
 func (tp *TransactionPool) LoadFile() error {
 	if !utils.FileExists(constcoe.TRANSACTIONPOOLFILE) {
 		//文件不存在返回nil
@@ -46,16 +63,4 @@ func (tp *TransactionPool) LoadFile() error {
 
 	tp.PubTx = transactionPool.PubTx
 	return nil
-}
-
-func CreateTransactionPool() *TransactionPool {
-	transactionPool := TransactionPool{}
-	err := transactionPool.LoadFile()
-	utils.Handle(err)
-	return &transactionPool
-}
-
-func RemoveTransactionPoolFile() error {
-	err := os.Remove(constcoe.TRANSACTIONPOOLFILE)
-	return err
 }
